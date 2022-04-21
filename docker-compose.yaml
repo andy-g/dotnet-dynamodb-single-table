@@ -1,0 +1,42 @@
+version: '3.8'
+services:
+  dynamodb-local:
+    command: "-jar DynamoDBLocal.jar -sharedDb -dbPath ./data"
+    image: "amazon/dynamodb-local:latest"
+    ports:
+      - "8000:8000"
+    volumes:
+      - "./docker/dynamodb:/home/dynamodblocal/data"
+    working_dir: /home/dynamodblocal
+  movies:
+    depends_on:
+      - dynamodb-local
+    image: mcr.microsoft.com/dotnet/sdk:5.0
+    command: bash -c "dotnet watch run --no-launch-profile"
+    working_dir: /app
+    volumes:
+      - ./Movies.API:/app
+    environment:
+      ASPNETCORE_URLS: http://*:80
+      ASPNETCORE_ENVIRONMENT: Development
+      Logging__Console__FormatterName: Simple # Json
+      AWS_ACCESS_KEY_ID: 'DUMMYIDEXAMPLE'
+      AWS_SECRET_ACCESS_KEY: 'DUMMYEXAMPLEKEY'
+      AWS_DEFAULT_REGION: eu-west-1
+      DynamoDBConfig__ServiceURL: http://dynamodb-local:8000/
+    ports:
+      - 5000:80 #http
+  aws-cli:
+    depends_on:
+      - dynamodb-local
+    image: amazon/aws-cli
+    environment:
+      AWS_ACCESS_KEY_ID: 'DUMMYIDEXAMPLE'
+      AWS_SECRET_ACCESS_KEY: 'DUMMYEXAMPLEKEY'
+      AWS_DEFAULT_REGION: eu-west-1
+      # Overeride entrypoint to wait for dynamodb to come up:
+      # https://github.com/aws/aws-cli/blob/v2/docker/Dockerfile
+    entrypoint: sh -c "sleep 5"
+    command:
+      - /usr/local/bin/aws
+      - 'dynamodb create-table --endpoint-url http://dynamodb-local:8000 --table-name MovieService --attribute-definitions AttributeName=PK,AttributeType=S AttributeName=SK,AttributeType=S AttributeName=GSI_1,AttributeType=S --key-schema AttributeName=PK,KeyType=HASH AttributeName=SK,KeyType=RANGE --provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5 --table-class STANDARD --global-secondary-indexes "[{\"IndexName\": \"GSI_1_INDEX\",\"KeySchema\": [{\"AttributeName\":\"GSI_1\",\"KeyType\":\"HASH\"},{\"AttributeName\":\"SK\",\"KeyType\":\"RANGE\"}],\"Projection\":{\"ProjectionType\":\"ALL\"},\"ProvisionedThroughput\": {\"ReadCapacityUnits\": 10,\"WriteCapacityUnits\": 5}}]"'
