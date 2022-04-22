@@ -30,13 +30,12 @@ services:
     depends_on:
       - dynamodb-local
     image: amazon/aws-cli
+    volumes:
+      - ./dynamodb-table.json:/aws/dynamodb-table.json
     environment:
       AWS_ACCESS_KEY_ID: 'DUMMYIDEXAMPLE'
       AWS_SECRET_ACCESS_KEY: 'DUMMYEXAMPLEKEY'
       AWS_DEFAULT_REGION: eu-west-1
       # Overeride entrypoint to wait for dynamodb to come up:
       # https://github.com/aws/aws-cli/blob/v2/docker/Dockerfile
-    entrypoint: sh -c "sleep 5"
-    command:
-      - /usr/local/bin/aws
-      - 'dynamodb create-table --endpoint-url http://dynamodb-local:8000 --table-name MovieService --attribute-definitions AttributeName=PK,AttributeType=S AttributeName=SK,AttributeType=S AttributeName=GSI_1,AttributeType=S --key-schema AttributeName=PK,KeyType=HASH AttributeName=SK,KeyType=RANGE --provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5 --table-class STANDARD --global-secondary-indexes "[{\"IndexName\": \"GSI_1_INDEX\",\"KeySchema\": [{\"AttributeName\":\"GSI_1\",\"KeyType\":\"HASH\"},{\"AttributeName\":\"SK\",\"KeyType\":\"RANGE\"}],\"Projection\":{\"ProjectionType\":\"ALL\"},\"ProvisionedThroughput\": {\"ReadCapacityUnits\": 10,\"WriteCapacityUnits\": 5}}]"'
+    command: 'dynamodb create-table --endpoint-url http://dynamodb-local:8000 --cli-input-json file://dynamodb-table.json'
